@@ -4,7 +4,6 @@ Status per stage: "done" (understood/built), "current" (what we're on now), "tod
 Run: python docs/make_pipeline_diagram.py  -> writes docs/pipeline.png
 """
 from pathlib import Path
-import shutil
 
 import matplotlib
 matplotlib.use("Agg")
@@ -13,7 +12,6 @@ from matplotlib.patches import FancyBboxPatch, FancyArrowPatch
 
 HERE = Path(__file__).resolve().parent
 OUT = HERE / "pipeline.png"
-DOWNLOADS = Path("/mnt/c/Users/noahj/Downloads")
 
 # colors
 INK = "#1f2937"
@@ -106,8 +104,6 @@ def draw():
 
     fig.savefig(OUT, bbox_inches="tight", pad_inches=0.25)
     plt.close(fig)
-    if DOWNLOADS.exists():
-        shutil.copy(OUT, DOWNLOADS / "tinyserve-pipeline.png")
     print(f"wrote {OUT} ({OUT.stat().st_size} bytes)")
 
 
