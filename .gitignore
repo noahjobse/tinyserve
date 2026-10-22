@@ -4,6 +4,7 @@ __pycache__/
 venv/
 data/*.bin
 data/*.pkl
+data/*.txt
 *.pt
 .env
 .DS_Store
