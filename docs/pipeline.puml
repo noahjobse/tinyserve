@@ -10,14 +10,14 @@ skinparam rectangle {
   FontSize 13
   BorderThickness 2
 }
-title tinyserve: the generation pipeline
+title tinyserve: the generation pipeline\n// concept understood end-to-end -- next: build it (train the model) //
 
 rectangle "**Text**\n\"The cat sat\"" as text #back:dbeafe;line:2563eb
-rectangle "**Tokenize**\ntext <-> ID numbers" as tok #back:dbeafe;line:2563eb
-rectangle "**Embeddings**\nIDs -> vectors (512-d)" as emb #back:dbeafe;line:2563eb
-rectangle "**Transformer**\nattention (left-only) ok + MLP next\n// you are here //" as xf #back:fef3c7;line:d97706
-rectangle "**Next-token scores**\n~50k token scores" as scores #back:f3f4f6;line:9ca3af;line.dashed
-rectangle "**Pick a token**\nsample one" as pick #back:f3f4f6;line:9ca3af;line.dashed
+rectangle "**Tokenize**\ntext <-> ID numbers (~50k vocab)" as tok #back:dbeafe;line:2563eb
+rectangle "**Embeddings**\nIDs -> vectors (512-d, +position)" as emb #back:dbeafe;line:2563eb
+rectangle "**Transformer**\nattention (gather) + MLP (think), x8" as xf #back:dbeafe;line:2563eb
+rectangle "**Next-token scores**\nvector -> ~50k probabilities" as scores #back:dbeafe;line:2563eb
+rectangle "**Pick a token**\nsample (temp / top-p)" as pick #back:dbeafe;line:2563eb
 
 text  -> tok
 tok   -> emb
