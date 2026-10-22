@@ -1,13 +1,13 @@
-1/ I just built a RAG agent from scratch, no frameworks. The next one aims higher: a small LLM inference server, built from nothing.
+ok, next project. built a RAG agent from scratch a while back, no frameworks, and I want to go a level deeper this time.
 
-Two halves. A model trained by hand, and the server that runs it fast under load.
+a tiny LLM inference server from scratch. the model, trained by hand, and the server that actually runs it fast under load.
 
-2/ Naive text generation recomputes everything, every token. A real server keeps a KV cache, batches requests, schedules them, and holds tail latency down under load.
+the part I keep chewing on: naive generation recomputes the whole sequence every single token. a real server dodges that with a KV cache, batches requests together, schedules them, keeps the GPU busy.
 
-This is the engineering under every AI product I use, and I couldn't build a piece of it. Time to change that.
+I've leaned on this stuff for years and couldn't build a piece of it. that's the itch.
 
-3/ I'm Noah, an engineer at Hoodo Technologies, building in public to understand the infrastructure I lean on every day.
+(I'm Noah, engineer at Hoodo, doing this mostly to actually understand it)
 
-It ends with a live demo you can fire traffic at and watch the latency move. Follow along.
+building it all in public, one piece at a time, mistakes and all. ends with a little demo you can throw traffic at and watch it sweat.
 
-First post: [blog link when live]
+first post soon: [blog link when live]
