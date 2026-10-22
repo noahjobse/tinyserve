@@ -15,7 +15,7 @@ title tinyserve: the generation pipeline
 rectangle "**Text**\n\"The cat sat\"" as text #back:dbeafe;line:2563eb
 rectangle "**Tokenize**\ntext <-> ID numbers" as tok #back:dbeafe;line:2563eb
 rectangle "**Embeddings**\nIDs -> vectors (512-d)" as emb #back:dbeafe;line:2563eb
-rectangle "**Transformer**\nattention + MLP\n// you are here //" as xf #back:fef3c7;line:d97706
+rectangle "**Transformer**\nattention (left-only) ok + MLP next\n// you are here //" as xf #back:fef3c7;line:d97706
 rectangle "**Next-token scores**\n~50k token scores" as scores #back:f3f4f6;line:9ca3af;line.dashed
 rectangle "**Pick a token**\nsample one" as pick #back:f3f4f6;line:9ca3af;line.dashed
 
