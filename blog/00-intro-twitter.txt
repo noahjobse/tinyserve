@@ -1,13 +1,13 @@
-ok, next project. built a RAG agent from scratch a while back, no frameworks, and I want to go a level deeper this time.
+Ok, next project. I built a RAG agent from scratch a while back, no frameworks, and I want to go a level deeper this time.
 
-a tiny LLM inference server from scratch. the model, trained by hand, and the server that actually runs it fast under load.
+A tiny LLM inference server from scratch. The model, trained by hand, and the server that actually runs it fast under load.
 
-the part I keep chewing on: naive generation recomputes the whole sequence every single token. a real server dodges that with a KV cache, batches requests together, schedules them, keeps the GPU busy.
+The part I keep chewing on: naive generation recomputes the whole sequence every single token. A real server dodges that with a KV cache, batches requests together, schedules them, keeps the GPU busy.
 
-I've leaned on this stuff for years and couldn't build a piece of it. that's the itch.
+I've leaned on this stuff for years and couldn't build a piece of it. That's the itch.
 
-(I'm Noah, engineer at Hoodo, doing this mostly to actually understand it)
+I'm Noah, an engineer at Hoodo Technologies. I build web and AI products for work, and on the side I do these from-scratch builds to actually understand the tools I lean on. Last one was the RAG agent, this one's the infra that serves models.
 
-building it all in public, one piece at a time, mistakes and all. ends with a little demo you can throw traffic at and watch it sweat.
+Building it all in public, one piece at a time, mistakes and all. Ends with a little demo you can throw traffic at and watch it sweat.
 
-first post soon: [blog link when live]
+First post soon: [blog link when live]
