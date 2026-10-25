@@ -1,0 +1,11 @@
+Starting my next build-in-public project: a small LLM inference server from scratch. No vLLM, no serving framework. Two halves, both by hand: a tiny language model, and the server that runs it fast under load.
+
+Before writing any of the server, I wanted to understand one thing: what makes inference slow, and what makes it fast. It came down to a single idea, and it's the first big ML concept that's clicked for me.
+
+When a model generates text, the GPU loads the entire model's weights out of memory for every token, and the math it does on them is almost nothing. So it finishes the math instantly and sits there waiting for the next load of weights. The bottleneck is memory bandwidth, and the expensive compute units sit idle. That's "memory-bound."
+
+Which is why batching is the whole game. The weights load no matter what, so if you run many requests through the same loaded weights at once, you get far more work for the same memory cost. On my laptop GPU (RTX 4050: 192 GB/s bandwidth, 8.986 FP16 TFLOP/s), the math says I can batch roughly 47 requests almost for free before the GPU flips from memory-bound to compute-bound. That number is what the whole server gets organized around.
+
+The roofline below shows it: a single request sits deep in memory-bound territory, and batching walks you up the slope to the ridge.
+
+Writing up each layer as I build it, mistakes included. The full version, plus the roadmap, is on my blog: https://noahjobse.dev/blog/building-an-llm-inference-server-from-scratch

@@ -1,0 +1,13 @@
+[attach part1-roofline.png to Tweet 1]
+
+Tweet 1:
+Before building an LLM inference server on my laptop GPU, I ran the roofline for it. RTX 4050: 192 GB/s, 8.986 FP16 TFLOP/s. The ridge sits at about 47 FLOPs per byte, and that one number decides how the whole server gets built.
+
+Tweet 2:
+Decode is memory-bound. To make each token the GPU loads the entire model's weights from memory and does almost no math on them, so it finishes instantly and waits on the next load. The compute units sit idle, bandwidth is the bottleneck.
+
+Tweet 3:
+The weights load regardless, so running many requests through the same loaded weights is close to free. Arithmetic intensity roughly equals batch size, so ~47 is where decode flips from memory-bound to compute-bound. Batch up to there and throughput is almost free.
+
+Tweet 4:
+The roofline makes it concrete: a single request sits deep in memory-bound territory near 1 FLOP/byte, and batching walks up the slope to the ridge. Full writeup and the roadmap: noahjobse.dev/blog/building-an-llm-inference-server-from-scratch
