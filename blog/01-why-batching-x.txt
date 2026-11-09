@@ -10,4 +10,7 @@ Tweet 3:
 The weights load regardless, so running many requests through the same loaded weights is close to free. Arithmetic intensity roughly equals batch size, so ~47 is where decode flips from memory-bound to compute-bound. Batch up to there and throughput is almost free.
 
 Tweet 4:
-The roofline makes it concrete: a single request sits deep in memory-bound territory near 1 FLOP/byte, and batching walks up the slope to the ridge. Full writeup and the roadmap: noahjobse.dev/blog/building-an-llm-inference-server-from-scratch
+The roofline makes it concrete: a single request sits deep in memory-bound territory near 1 FLOP/byte, and batching walks up the slope to the ridge.
+
+Tweet 5:
+This is the start of tinyserve: an LLM inference server built from scratch, the model and the server both by hand. Next is training the model, then the KV cache and continuous batching, then serving it and benchmarking tail latency under load. Writeups as I go: noahjobse.dev/blog/building-an-llm-inference-server-from-scratch
