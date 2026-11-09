@@ -1,33 +1,44 @@
 """Training loop for tinyserve's GPT.
 
-Defaults here are a small, fast SMOKE-TEST config (proves the model learns on
-tiny-shakespeare on a CPU in a couple of minutes). For the real TinyStories run
-on the GPU, bump block_size / n_layer / n_head / n_embd / max_iters back up.
+Defaults are the REAL run: the full ~50M model on TinyStories, bf16 on the GPU.
+Every knob is overridable by env var, so a quick CPU smoke test is e.g.:
+    DATASET=shakespeare BLOCK_SIZE=64 N_LAYER=2 N_EMBD=64 MAX_ITERS=20 python train.py
 
+Real run (on the GPU):
     python train.py
 """
 import os
+from contextlib import nullcontext
 
 import numpy as np
+import tiktoken
 import torch
 import torch.nn.functional as F
 
 from model import GPT, GPTConfig
 
-# --- config (smoke-test sized) ---
-DATA_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data")
-device = "cuda" if torch.cuda.is_available() else "cpu"
-block_size = 64
-batch_size = 16
-n_layer, n_head, n_embd = 4, 4, 128
-max_iters = 500
-eval_interval = 100
-eval_iters = 20
-lr = 3e-4
+# --- config (env-overridable) ---
+def _int(k, d): return int(os.environ.get(k, d))
 
-# --- data: memory-map the token streams, grab random chunks ---
+DATA_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data")
+dataset = os.environ.get("DATASET", "tinystories")
+block_size = _int("BLOCK_SIZE", 512)
+batch_size = _int("BATCH_SIZE", 16)
+n_layer = _int("N_LAYER", 8)
+n_head = _int("N_HEAD", 8)
+n_embd = _int("N_EMBD", 512)
+max_iters = _int("MAX_ITERS", 5000)
+eval_interval = _int("EVAL_INTERVAL", 500)
+eval_iters = _int("EVAL_ITERS", 100)
+lr = float(os.environ.get("LR", 3e-4))
+
+device = "cuda" if torch.cuda.is_available() else "cpu"
+ctx = (torch.autocast(device_type="cuda", dtype=torch.bfloat16)
+       if device == "cuda" else nullcontext())
+
+# --- data ---
 def load(split):
-    path = os.path.join(DATA_DIR, f"shakespeare_{split}.bin")
+    path = os.path.join(DATA_DIR, f"{dataset}_{split}.bin")
     return np.memmap(path, dtype=np.uint16, mode="r")
 
 train_data, val_data = load("train"), load("val")
@@ -51,24 +62,43 @@ def estimate_loss():
         losses = torch.zeros(eval_iters)
         for k in range(eval_iters):
             x, y = get_batch(split)
-            losses[k] = loss_fn(model(x), y).item()
+            with ctx:
+                losses[k] = loss_fn(model(x), y).item()
         out[split] = losses.mean().item()
     model.train()
     return out
+
+@torch.no_grad()
+def sample(max_new_tokens=200):
+    model.eval()
+    enc = tiktoken.get_encoding("gpt2")
+    idx = torch.tensor([[enc.eot_token]], dtype=torch.long, device=device)
+    for _ in range(max_new_tokens):
+        idx_cond = idx[:, -block_size:]
+        with ctx:
+            logits = model(idx_cond)
+        probs = F.softmax(logits[:, -1, :], dim=-1)
+        idx = torch.cat([idx, torch.multinomial(probs, num_samples=1)], dim=1)
+    model.train()
+    return enc.decode(idx[0].tolist())
 
 # --- model + optimizer ---
 config = GPTConfig(block_size=block_size, n_layer=n_layer, n_head=n_head, n_embd=n_embd)
 model = GPT(config).to(device)
 optimizer = torch.optim.AdamW(model.parameters(), lr=lr)
 
-print(f"device={device}, params={sum(p.numel() for p in model.parameters()) / 1e6:.1f}M")
+print(f"dataset={dataset}, device={device}, params={sum(p.numel() for p in model.parameters()) / 1e6:.1f}M")
 for it in range(max_iters + 1):
     if it % eval_interval == 0:
         losses = estimate_loss()
-        print(f"iter {it:4d} | train {losses['train']:.3f} | val {losses['val']:.3f}")
+        print(f"iter {it:5d} | train {losses['train']:.3f} | val {losses['val']:.3f}")
     x, y = get_batch("train")
-    loss = loss_fn(model(x), y)
+    with ctx:
+        loss = loss_fn(model(x), y)
     optimizer.zero_grad()
     loss.backward()
     optimizer.step()
-print("done")
+
+torch.save({"model": model.state_dict(), "config": config}, os.path.join(DATA_DIR, "..", "ckpt.pt"))
+print("\nsaved ckpt.pt\n\n--- sample ---")
+print(sample())
