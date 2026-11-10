@@ -1,0 +1,15 @@
+[attach kv-speedup.png]
+
+I built a KV cache for my from-scratch LLM, the first real piece of inference engineering in this project. It made generation 1.4x faster. Not the 10x you might expect, and the small number is the interesting part.
+
+First, the waste it removes. To generate text, the model produces one token at a time, and a naive loop reprocesses the entire sequence before each new token. For a 500-token story, the first token gets reprocessed about 500 times. That is O(T^2) work to produce T tokens, almost all of it redundant.
+
+Causal attention is why it is safe to stop. Every token only looks left, so once a token's key and value are computed, they are frozen. Nothing in the future changes them. So you compute each token's reusable part once, save it, and reuse it. You cache keys and values, but not queries: a past query is used exactly once, at its own step, and never again.
+
+The part I care about most: before measuring any speed, I wrote a correctness test. Generate greedily through the cached path and through the naive recompute path, and assert the two outputs are byte-identical. A cache is exactly the kind of optimization that can be subtly wrong and still look plausible. It passed. No optimization counts in this project until something other than me confirms it is still correct.
+
+Then the honest result: 1.4x. At 51M parameters and a few hundred tokens, each step is dominated by fixed costs (the output projection over 50,000 vocab words, kernel-launch overhead) rather than the attention recompute the cache removes. The payoff scales with sequence length, so it is modest on short stories and dramatic on long contexts. I could have reported a bigger number by cherry-picking a longer sequence. The real result is more useful: for a single stream at this scale, the bottleneck is overhead, not recompute.
+
+Which is exactly the argument for what is next. If fixed overhead dominates one stream, you win by amortizing it across many requests at once, and the KV cache is what makes batching possible. That is where throughput takes off.
+
+Full write-up: noahjobse.dev/blog/building-a-kv-cache-and-the-honest-speedup

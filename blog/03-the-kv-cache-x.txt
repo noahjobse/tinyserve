@@ -1,0 +1,19 @@
+[attach kv-speedup.png to Tweet 1]
+
+Tweet 1:
+Built a KV cache for my from-scratch LLM. It made generation 1.4x faster, not the 10x you might expect, and the small number is the actual finding. The cache holds flat throughput while the naive path degrades with length.
+
+Tweet 2:
+The waste it removes: to generate each token, a naive model reprocesses the entire sequence before it. For a 500-token story the first token gets reprocessed about 500 times. O(T^2) work to produce T tokens, almost all of it redundant.
+
+Tweet 3:
+Causal attention is why it's safe to stop. A past token only ever looked left, so once its key and value are computed they are frozen. Cache them, reuse them. You cache K and V, not Q: a past query is used once at its own step and never again.
+
+Tweet 4:
+Before timing anything I wrote the oracle: greedy decode through the cached path must be byte-identical to the naive recompute path. A cache is exactly the kind of bug that yields plausible-but-wrong output you never notice. It passed, so the fast path is provably the same tokens.
+
+Tweet 5:
+Why only 1.4x: at 51M params and a few hundred tokens, each step is dominated by fixed costs (the 50k-vocab output projection, kernel launches), not the attention recompute the cache removes. The payoff scales with sequence length: modest on short stories, dramatic on long contexts.
+
+Tweet 6:
+Which is exactly why batching is next. If a single stream is bottlenecked on fixed overhead, you win by amortizing it across many requests at once, and the KV cache is what makes that possible since each request carries its own. Full write-up: noahjobse.dev/blog/building-a-kv-cache-and-the-honest-speedup
