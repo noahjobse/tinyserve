@@ -6,6 +6,7 @@ import torch
 # Neural-net builfing blocks called 'nn'
 import torch.nn as nn
 import torch.nn.functional as F
+import math
 
 
 # GPT config settings using dataclass
@@ -104,6 +105,9 @@ class GPT(nn.Module):
         self.lm_head = nn.Linear(config.n_embd, config.vocab_size, bias=False)
         self.lm_head.weight = self.wte.weight
         self.apply(self._init_weights)
+        for name, p in self.named_parameters():
+            if name.endswith("proj.weight"):
+                nn.init.normal_(p, mean=0.0, std=0.02 / math.sqrt(2 * config.n_layer))
 
     def _init_weights(self, module):
         if isinstance(module, nn.Linear):
