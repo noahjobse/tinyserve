@@ -32,39 +32,31 @@ class GPTConfig:
     dropout: float = 0.0
 
 
-class Head(nn.Module):
-    def __init__(self, n_embd, head_size, block_size):
-        super().__init__()
-        self.query = nn.Linear(n_embd, head_size, bias=False)
-        self.key   = nn.Linear(n_embd, head_size, bias=False)
-        self.value = nn.Linear(n_embd, head_size, bias=False)
-        self.register_buffer("tril", torch.tril(torch.ones(block_size, block_size)))
-
-    def forward(self, x):
-        B, T, C = x.shape
-        q = self.query(x)
-        k = self.key(x)
-        v = self.value(x)
-        scores = q @ k.transpose(-2, -1) * k.size(-1) ** -0.5
-        scores = scores.masked_fill(self.tril[:T, :T] == 0, float("-inf"))
-        weights = F.softmax(scores, dim=-1)
-        out = weights @ v
-        return out
-
-
-class MultiHeadAttention(nn.Module):
+class CausalSelfAttention(nn.Module):
     def __init__(self, config: GPTConfig):
         super().__init__()
-        head_size = config.n_embd // config.n_head
-        self.heads = nn.ModuleList(
-            [Head(config.n_embd, head_size, config.block_size) for _ in range(config.n_head)]
-        )
+        self.n_head = config.n_head
+        self.head_size = config.n_embd // config.n_head
+        self.qkv  = nn.Linear(config.n_embd, 3 * config.n_embd, bias=False)
         self.proj = nn.Linear(config.n_embd, config.n_embd)
+        self.register_buffer("tril", torch.tril(torch.ones(config.block_size, config.block_size)))
 
-    def forward(self, x):
-        out = torch.cat([h(x) for h in self.heads], dim=-1)
-        out = self.proj(out)
-        return out
+    def forward(self, x, cache=None):
+        B, T, C = x.shape
+        q, k, v = self.qkv(x).split(C, dim=2)                        # each (B, T, C)
+        q = q.view(B, T, self.n_head, self.head_size).transpose(1, 2)  # (B, nh, T, hs)
+        k = k.view(B, T, self.n_head, self.head_size).transpose(1, 2)
+        v = v.view(B, T, self.n_head, self.head_size).transpose(1, 2)
+        if cache is not None:                        # decode: prepend the cached past
+            past_k, past_v = cache
+            k = torch.cat((past_k, k), dim=2)
+            v = torch.cat((past_v, v), dim=2)
+        Tk = k.size(2)                               # total keys = past + new
+        scores = (q @ k.transpose(-2, -1)) * self.head_size ** -0.5   # (B, nh, T, Tk)
+        scores = scores.masked_fill(self.tril[Tk - T:Tk, :Tk] == 0, float("-inf"))
+        weights = F.softmax(scores, dim=-1)
+        out = (weights @ v).transpose(1, 2).reshape(B, T, C)
+        return self.proj(out), (k, v)
 
 
 class MLP(nn.Module):
@@ -84,14 +76,15 @@ class Block(nn.Module):
     def __init__(self, config: GPTConfig):
         super().__init__()
         self.ln1  = nn.LayerNorm(config.n_embd)
-        self.attn = MultiHeadAttention(config)
+        self.attn = CausalSelfAttention(config)
         self.ln2  = nn.LayerNorm(config.n_embd)
         self.mlp  = MLP(config)
 
-    def forward(self, x):
-        x = x + self.attn(self.ln1(x))
+    def forward(self, x, cache=None):
+        a, new_cache = self.attn(self.ln1(x), cache)
+        x = x + a
         x = x + self.mlp(self.ln2(x))
-        return x
+        return x, new_cache
 
 
 class GPT(nn.Module):
@@ -117,14 +110,26 @@ class GPT(nn.Module):
         elif isinstance(module, nn.Embedding):
             nn.init.normal_(module.weight, mean=0.0, std=0.02)
 
-    def forward(self, idx):
+    def forward(self, idx, caches=None):
         B, T = idx.shape
+        past_len = caches[0][0].size(2) if caches is not None else 0
         tok_emb = self.wte(idx)
-        pos = torch.arange(T, device=idx.device)
+        pos = torch.arange(past_len, past_len + T, device=idx.device)
         pos_emb = self.wpe(pos)
         x = tok_emb + pos_emb
-        for block in self.blocks:
-            x = block(x)
+        new_caches = []
+        for i, block in enumerate(self.blocks):
+            x, nc = block(x, caches[i] if caches is not None else None)
+            new_caches.append(nc)
         x = self.ln_f(x)
         logits = self.lm_head(x)
-        return logits
+        return logits, new_caches
+
+    @torch.no_grad()
+    def generate(self, idx, max_new_tokens):
+        logits, caches = self(idx)                     # prefill: run the whole prompt once
+        for _ in range(max_new_tokens):
+            next_id = logits[:, -1, :].argmax(dim=-1, keepdim=True)   # greedy
+            idx = torch.cat((idx, next_id), dim=1)
+            logits, caches = self(next_id, caches)     # decode: one token, reuse the cache
+        return idx

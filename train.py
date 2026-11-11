@@ -75,7 +75,7 @@ def estimate_loss():
         for k in range(eval_iters):
             x, y = get_batch(split)
             with ctx:
-                losses[k] = loss_fn(model(x), y).item()
+                losses[k] = loss_fn(model(x)[0], y).item()
         out[split] = losses.mean().item()
     model.train()
     return out
@@ -87,7 +87,7 @@ def sample(max_new_tokens=200):
     idx = torch.tensor([[enc.eot_token]], dtype=torch.long, device=device)
     for _ in range(max_new_tokens):
         with ctx:
-            logits = model(idx[:, -block_size:])
+            logits = model(idx[:, -block_size:])[0]
         probs = F.softmax(logits[:, -1, :], dim=-1)
         idx = torch.cat([idx, torch.multinomial(probs, num_samples=1)], dim=1)
     model.train()
@@ -119,7 +119,7 @@ for it in range(start_iter, max_iters + 1):
         save(it)
     x, y = get_batch("train")
     with ctx:
-        loss = loss_fn(model(x), y)
+        loss = loss_fn(model(x)[0], y)
     optimizer.zero_grad()
     loss.backward()
     torch.nn.utils.clip_grad_norm_(model.parameters(), grad_clip)
